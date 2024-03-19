@@ -8,45 +8,72 @@
 
 import Foundation
 
-// MARK: WeatherService
+protocol AppRequest {
+    var urlRequest: URLRequest { get }
+}
 
-class WeatherService: ObservableObject {
+
+struct WeatherRequest: AppRequest {
+    var url: URL
+    var urlRequest: URLRequest {
+        return URLRequest(url: url)
+    }
+}
+
+
+
+protocol Service {
+    func get(request: AppRequest, completion: @escaping (Result<Data, Error>) -> Void)
+}
+
+/// A concrete implementation of Service class responsible for getting a Network resource
+final class NetworkService: Service {
     
-    func fetchWeatherData(latitude: Double, longitude: Double, completion: @escaping (Result<WeatherData, Error>) -> Void) {
-        
-        let apiKey = "db46c658909947a5902203242241803"
-        let urlString = "https://api.weatherapi.com/v1/current.json?key=\(apiKey)&q=\(latitude),\(longitude)"
-        
-        guard let url = URL(string: urlString) else {
-            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
-            return
-        }
-        
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+    func get(request: AppRequest, completion: @escaping (Result<Data, Error>) -> Void) {
+        URLSession.shared.dataTask(with: request.urlRequest) { (data, response, error) in
+            if let response = response as? HTTPURLResponse {
+                print("statusCode: \(response.statusCode)")
+                switch (response.statusCode){
+                case 400, 401, 404, 429, 500..<999:
+                    completion(.failure(self.throwNetworkError(response.statusCode)))
+                default:
+                    completion(.failure(NetworkError.httpRequestFailed))
+                }
+            }
+            
             if let error = error {
                 completion(.failure(error))
-                print(error.localizedDescription)
                 return
             }
             
-            // Check if data is received from the server.
             guard let data = data else {
-                completion(.failure(NSError(domain: "No data received", code: 0, userInfo: nil)))
-                print("No data received")
+                completion(.failure(NetworkError.httpRequestFailed))
                 return
             }
-            
-            do {
-                let decoder = JSONDecoder()
-                let weatherData = try decoder.decode(WeatherData.self, from: data)
-                completion(.success(weatherData))
-                print(weatherData)
-            } catch {
-                completion(.failure(error))
-                print(error.localizedDescription)
-            }
-        }
-        task.resume()
+            completion(.success(data))
+        }.resume()
     }
+    
+    private func throwNetworkError(_ statusCode: Int) -> NetworkError {
+        
+        switch statusCode {
+        case 400:
+            return NetworkError.APIRequestUrlIsInvalid
+        case 401:
+            return NetworkError.APIKeyNotprovided
+        case 403:
+            return NetworkError.APIKeyHasExceededCallsPerMonthQuota
+        default:
+            return NetworkError.httpRequestFailed
+        }
+    }
+}
+
+
+enum NetworkError: Error {
+    case APIRequestUrlIsInvalid
+    case APIKeyNotprovided
+    case APIKeyHasExceededCallsPerMonthQuota
+    case httpRequestFailed
 }
 
