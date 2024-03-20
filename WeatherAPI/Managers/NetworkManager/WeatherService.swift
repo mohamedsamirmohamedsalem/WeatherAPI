@@ -60,7 +60,7 @@ final class NetworkService: Service {
         case 400:
             return NetworkError.APIRequestUrlIsInvalid
         case 401:
-            return NetworkError.APIKeyNotprovided
+            return NetworkError.APIKeyNotProvided
         case 403:
             return NetworkError.APIKeyHasExceededCallsPerMonthQuota
         default:
@@ -72,7 +72,7 @@ final class NetworkService: Service {
 
 enum NetworkError: Error {
     case APIRequestUrlIsInvalid
-    case APIKeyNotprovided
+    case APIKeyNotProvided
     case APIKeyHasExceededCallsPerMonthQuota
     case httpRequestFailed
 }

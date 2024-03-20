@@ -11,19 +11,21 @@ import Combine
 class WeatherViewModel {
     
     let networkService: Service
+    
     var weatherData = PassthroughSubject<WeatherData,Never>()
+    var forecastList = CurrentValueSubject<[Forecastday],Never>([])
     var showLoader = PassthroughSubject<Bool, Never>()
     var errorMessage = PassthroughSubject<String,Never>()
-    
+
     
     init(networkService: Service) {
         self.networkService = networkService
     }
     
-    func fetchCurrentWeatherData(latitude: Double?, longitude: Double?)  {
+    func fetchWeatherData(latitude: Double?, longitude: Double?)  {
         guard let latitude, let longitude else { return }
         
-        guard let  url = URL(string: Endpoints.currentForecastWeatherURL(latitude: latitude, longitude: longitude)) else {return}
+        guard let  url = URL(string: Endpoints.currentAndFutureWeatherURL(latitude: latitude, longitude: longitude)) else {return}
         
         self.showLoader.send(true)
         
@@ -35,8 +37,9 @@ class WeatherViewModel {
                 self.errorMessage.send(error.localizedDescription)
             case .success(let data):
                 do {
-                    let weatherData = try? JSONDecoder().decode(WeatherData.self, from: data)
-                    self.weatherData.send(weatherData!)
+                    let weatherData = try JSONDecoder().decode(WeatherData.self, from: data)
+                    self.weatherData.send(weatherData)
+                    self.forecastList.send(weatherData.forecast.forecastday)
                     self.showLoader.send(false)
                 }catch {
                     self.showLoader.send(false)
